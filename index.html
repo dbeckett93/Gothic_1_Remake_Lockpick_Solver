@@ -216,6 +216,20 @@
       test a real move — couplings apply, so you can check the wiring matches your game.
       Plate is green when it's on pin&nbsp;4.
     </p>
+    <div class="row" style="margin-bottom:16px">
+      <div class="field">
+        <span>Plate order</span>
+        <div class="seg" id="flipSeg">
+          <button data-flip="top">P1 at top</button>
+          <button data-flip="bottom">P1 at bottom</button>
+        </div>
+      </div>
+      <p class="hint" style="flex:1;min-width:240px;margin:0;align-self:center">
+        Flip the stack so it matches what you see in‑game, then read the plates off in that order.
+        <b>P1 is only a label</b> — it can be any physical plate; the solver just needs you to stay
+        consistent. The solution's plate numbers follow this same top‑to‑bottom order.
+      </p>
+    </div>
     <div class="lock" id="lock"></div>
   </section>
 
@@ -274,6 +288,7 @@
   var state = {
     n: 5,
     edge: "block",       // the game's "walls" rule (fixed)
+    flip: false,         // false: P1 drawn at top; true: P1 at bottom (display only)
     positions: null,     // length n, 0..6 (current, also used as play scratch)
     effect: null,        // n x n
     solution: null,      // [{plate,dir}]
@@ -309,6 +324,7 @@
     var saved = load();
     if (saved) {
       state.n = saved.n;
+      state.flip = !!saved.flip;
       state.positions = saved.positions; state.effect = saved.effect;
     } else {
       state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
@@ -333,7 +349,7 @@
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        n: state.n, positions: state.positions, effect: state.effect
+        n: state.n, flip: state.flip, positions: state.positions, effect: state.effect
       }));
     } catch (e) {}
   }
@@ -369,6 +385,9 @@
     document.querySelectorAll("#plateSeg button").forEach(function (b) {
       b.classList.toggle("on", +b.dataset.k === state.n);
     });
+    document.querySelectorAll("#flipSeg button").forEach(function (b) {
+      b.classList.toggle("on", (b.dataset.flip === "bottom") === state.flip);
+    });
     renderLock();
     renderCouplings();
     renderResult();
@@ -393,7 +412,11 @@
     head.appendChild(document.createElement("div"));
     lock.appendChild(head);
 
-    for (var i = 0; i < state.n; i++) lock.appendChild(plateRow(i));
+    // P1..Pn keep their labels and handlers; flip only reverses draw order.
+    for (var k = 0; k < state.n; k++) {
+      var i = state.flip ? (state.n - 1 - k) : k;
+      lock.appendChild(plateRow(i));
+    }
   }
 
   function plateRow(i) {
@@ -661,6 +684,11 @@
   }
 
   // ---------- wiring ----------
+  document.getElementById("flipSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-flip]"); if (!b) return;
+    state.flip = (b.dataset.flip === "bottom"); // display-only; keeps any solution valid
+    save(); renderAll();
+  });
   document.getElementById("resetBtn").onclick = function () {
     state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
     state.effect = zeros(state.n);

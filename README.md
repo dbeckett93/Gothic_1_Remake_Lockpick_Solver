@@ -27,7 +27,9 @@ This tool models exactly that and searches for an optimal solution.
 1. **Lock setup** — pick the number of plates.
 2. **Current positions** — click a slot on each plate to mark where its pin sits right now. The
    green‑tinted column is the target (pin 4). Use the **◀ ▶** buttons to test a real move with
-   couplings applied — handy for sanity‑checking your wiring against the game.
+   couplings applied — handy for sanity‑checking your wiring against the game. The **Plate order**
+   toggle flips the stack (P1 at top ↔ P1 at bottom) so it matches what you see in‑game; it's a
+   display choice only and the solution's plate numbers follow it.
 3. **Couplings** — the grid starts **empty**; fill in only the links your lock actually has. Each
    **row** is one plate you push **one notch right**. Click a cell to cycle:
    - **→** the linked plate moves the **same** way you pushed,
@@ -77,8 +79,10 @@ trials, and an `N=7` performance check). A green `RESULT: PASS …` line at the 
   solution.
 - **Order matters.** Because of the walls, the steps are path‑dependent — follow them in order.
 - Made a mistake mid‑solve? Re‑click the slots to enter the lock's new positions and solve again.
-- Some community guides number plates **bottom‑to‑top**. This tool labels them `P1` (top) … `Pn`;
-  just map each physical plate to a row consistently and the steps will line up.
+- `P1` is just a label, not a fixed physical plate — map each real plate to a row however is
+  easiest and stay consistent across positions, couplings, and the solution. Some guides number
+  plates bottom‑to‑top; use the **Plate order** toggle to put `P1` at the top or bottom so the
+  on‑screen stack matches your view.
 
 ## Prior art & sources
 
