@@ -220,9 +220,10 @@
   <section class="panel">
     <h2>2 · The lock &amp; current positions</h2>
     <p class="hint">
-      Click a <b>slot</b> to set where a plate sits right now. Use the <b>◀ ▶</b> buttons to
-      test a real move — couplings apply, so you can check the wiring matches your game.
-      Plate is green when it's on pin&nbsp;4.
+      Click a <b>slot</b> to set where each plate's <b>pin</b> sits right now (the lit hole). The
+      <b>◀ ▶</b> buttons press that plate's left / right control — its pin then slides the
+      <b>opposite</b> way (push right → pin moves one hole left), and any coupled pins move too, so
+      you can check the wiring matches your game. A plate turns green when its pin is on hole&nbsp;4.
     </p>
     <div class="row" style="margin-bottom:16px">
       <div class="field">
@@ -245,15 +246,15 @@
   <section class="panel">
     <h2>3 · How the plates are wired (couplings)</h2>
     <p class="hint">
-      The grid starts <b>empty</b> — fill in only the links your lock has. Each row is one plate
-      you push <b>one notch</b>. Click the <b>arrow by its name</b> to set the direction you tested
-      (<span style="color:var(--green)">→ right</span> or <span style="color:var(--red)">← left</span>) —
-      the two are mirror images, so record whichever you actually did and the solver works out the
-      opposite. Then click a cell to show which way that plate <b>slides</b>:
+      The grid starts <b>empty</b> — fill in only the links your lock has. Each row is one plate.
+      Click the <b>arrow by its name</b> to set which <b>control you pressed</b>
+      (<span style="color:var(--green)">→ right</span> or <span style="color:var(--red)">← left</span>);
+      left and right are mirror images, so use whichever you tested. Then, for each other plate that
+      reacted, click its cell to show which way its <b>pin moved</b>:
       <span style="color:var(--green)">→ right</span>, <span style="color:var(--red)">← left</span>,
-      <span style="color:#5a4d3a">· stays put</span>. The shaded <b>•</b> is the plate itself — it
-      always moves when pushed, so you never set it. <b>To map a lock:</b> nudge one plate a single
-      notch in-game and watch which others move, and which way.
+      <span style="color:#5a4d3a">· didn't move</span>. The pushed plate's own pin (the shaded
+      <b>•</b>) slides opposite to the control automatically, so you never set it. <b>To map a
+      lock:</b> press one plate one notch in-game and watch which pins move, and which way.
     </p>
     <div class="cmatrix-wrap">
       <div class="cmatrix-edit"><div id="cmatrix"></div></div>
@@ -261,9 +262,9 @@
         <div class="example-title">Example — reading the grid</div>
         <table class="cmatrix" id="exampleMatrix"></table>
         <p class="example-cap">
-          Here, pushing <b>P1</b> right also shoves <b>P2</b> right; pushing <b>P2</b> right pulls
-          <b>P3</b> the other way (inverted). Everything else is blank. Push <b>left</b> and the
-          same links run in reverse.
+          Here, pressing <b>P1</b>'s right control sends <b>P2</b>'s pin right; pressing <b>P2</b>'s
+          right control sends <b>P3</b>'s pin left. Everything else stays put. Press <b>left</b> and
+          the same links run in reverse.
         </p>
       </aside>
     </div>
@@ -309,9 +310,10 @@
   var timer = null;
 
   // ---------- model helpers ----------
-  // The user only fills in couplings, so the grid starts fully blank (all zeros).
-  // "A pushed plate moves itself" (+1 on the diagonal) is applied automatically at
-  // solve/simulate time by effectiveEffect(), so the user never has to set it.
+  // State is PIN position (which hole, 0..6). The plate slides opposite to its pin:
+  // pressing a plate's RIGHT control slides the plate right, so its own pin moves one
+  // hole LEFT. That's the -1 on the diagonal, applied automatically by effectiveEffect().
+  // The user only fills in couplings (how OTHER pins move), so the grid starts blank.
   function zeros(n) {
     var m = [];
     for (var i = 0; i < n; i++) { var r = []; for (var j = 0; j < n; j++) r.push(0); m.push(r); }
@@ -333,7 +335,9 @@
   }
   function effectiveEffect() {
     var m = [];
-    for (var i = 0; i < state.n; i++) { var r = state.effect[i].slice(); r[i] = 1; m.push(r); }
+    // off-diagonal entries are how each OTHER pin moves; the diagonal is the pushed
+    // plate's own pin, which slides opposite to the control (-1 for a right press).
+    for (var i = 0; i < state.n; i++) { var r = state.effect[i].slice(); r[i] = -1; m.push(r); }
     return m;
   }
 
@@ -450,7 +454,7 @@
     var dot = document.createElement("span"); dot.className = "dot";
     var lbl = document.createElement("span"); lbl.textContent = "P" + (i + 1);
     var arrowsL = document.createElement("div"); arrowsL.className = "arrows left";
-    var bl = document.createElement("button"); bl.textContent = "◀"; bl.title = "Push P" + (i + 1) + " left";
+    var bl = document.createElement("button"); bl.textContent = "◀"; bl.title = "Press P" + (i + 1) + " left control (pin slides right)";
     bl.onclick = function () { manualMove(i, -1); };
     arrowsL.appendChild(bl);
     name.appendChild(dot); name.appendChild(lbl); name.appendChild(arrowsL);
@@ -467,7 +471,7 @@
     }
 
     var arrowsR = document.createElement("div"); arrowsR.className = "arrows";
-    var br = document.createElement("button"); br.textContent = "▶"; br.title = "Push P" + (i + 1) + " right";
+    var br = document.createElement("button"); br.textContent = "▶"; br.title = "Press P" + (i + 1) + " right control (pin slides left)";
     br.onclick = function () { manualMove(i, 1); };
     arrowsR.appendChild(br);
 
@@ -509,7 +513,7 @@
           cell.className = "cell self";
           cell.textContent = "•";
           cell.disabled = true;
-          cell.title = "P" + (i + 1) + " always moves itself when you push it";
+          cell.title = "P" + (i + 1) + "'s own pin moves automatically (opposite to the control you press)";
         } else {
           var v = state.effect[i][j2] * d; // shown for the direction you tested
           cell.className = "cell " + (v > 0 ? "pos" : v < 0 ? "neg" : "zero");
@@ -592,7 +596,8 @@
 
       var note = document.createElement("div");
       note.className = "small"; note.style.marginTop = "10px";
-      note.textContent = "Do the moves in this exact order. Press Play to watch the lock open.";
+      note.innerHTML = "Each step is the <b>control to press</b>: <b>→</b> = that plate's right, " +
+        "<b>←</b> = its left. Do them in this exact order. Press Play to watch the lock open.";
       box.appendChild(note);
     }
   }

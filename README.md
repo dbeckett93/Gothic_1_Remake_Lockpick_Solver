@@ -12,9 +12,11 @@ No build step, no server, no tracking — it's one HTML file plus one script. Op
 ## The minigame, in one paragraph
 
 A lock is a stack of **4–7 horizontal plates**. Each plate has **7 holes** and one pin; you
-select a plate and slide it **left / right** one notch at a time. The lock opens when **every
-pin sits in the centre hole (pin 4) at once**. The catch: plates are **wired together** — moving
-one plate also nudges one or more others by one notch, sometimes in the **opposite** direction.
+select a plate and slide it **left / right** one notch at a time. Because the plate slides under a
+fixed pin, the **pin moves the opposite way** — push the plate right and its pin shifts one hole
+**left**. The lock opens when **every pin sits in the centre hole (pin 4) at once**. The catch:
+plates are **wired together** — moving one plate also nudges one or more others by one notch,
+sometimes in the **opposite** direction.
 The wiring is **hidden** and **different for every lock**, and a pin **can't leave the row**: any
 push (including the knock‑on movement of a linked plate) that would shove a pin off either edge is
 **refused** (and in‑game strains/breaks your pick). You discover the wiring by tapping one plate
@@ -31,16 +33,16 @@ This tool models exactly that and searches for an optimal solution.
    toggle flips the stack (P1 at top ↔ P1 at bottom) so it matches what you see in‑game; it's a
    display choice only and the solution's plate numbers follow it.
 3. **Couplings** — the grid starts **empty**; fill in only the links your lock has. Each **row**
-   is one plate you push **one notch**. Click the **arrow by its name** to set the direction you
-   tested (**→** right or **←** left) — left and right are mirror images, so record whichever you
-   actually did and the solver works out the opposite. Then click a cell to show which way that
-   plate **slides**:
-   - **→** it slides right,
-   - **←** it slides left,
-   - **·** it doesn't move.
-   The shaded **•** on the diagonal is the plate itself — it always moves when you push it, so you
-   never set it. A worked example sits beside the grid to show the idea.
-4. **Solve** — get the ordered step list. Press **▶ Play** to watch the lock open one move at a
+   is one plate. Click the **arrow by its name** to set which **control you pressed** (**→** right
+   or **←** left) — left and right are mirror images, so use whichever you tested. Then, for each
+   other plate that reacted, click its cell to show which way its **pin moved**:
+   - **→** its pin moved right,
+   - **←** its pin moved left,
+   - **·** it didn't move.
+   The pushed plate's own pin (the shaded **•** on the diagonal) slides opposite to the control
+   automatically, so you never set it. A worked example sits beside the grid to show the idea.
+4. **Solve** — get the ordered step list, where each step is the **control to press** (**→** =
+   that plate's right, **←** = its left). Press **▶ Play** to watch the lock open one step at a
    time, or **Copy steps** to take the list with you.
 
 Your setup is saved in the browser, so a refresh won't lose it.
