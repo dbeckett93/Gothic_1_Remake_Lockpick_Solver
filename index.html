@@ -303,7 +303,6 @@
     pushDir: null,       // per-row input lens: +1 describe a right push, -1 a left push
     solution: null,      // [{plate,dir}]
     solveStart: null,    // positions snapshot at solve time
-    solveEdge: "block",  // edge rule that produced the current solution
     playIndex: 0,
     playing: false
   };
@@ -386,7 +385,7 @@
   // ---------- solution lifecycle ----------
   function clearSolution() {
     stopPlay();
-    state.solution = null; state.solveStart = null; state.solveEdge = "block"; state.playIndex = 0;
+    state.solution = null; state.solveStart = null; state.playIndex = 0;
     renderResult();
   }
 
@@ -560,29 +559,12 @@
     if (!state.solution) { meta.textContent = ""; return; }
 
     var moves = state.solution;
-    var fallback = state.solveEdge === "clamp";
     var sum = document.createElement("div");
     sum.className = "summary good";
-    if (moves.length === 0) {
-      sum.textContent = "Already solved — every plate is on pin 4.";
-    } else if (fallback) {
-      sum.className = "summary";
-      sum.style.color = "var(--brass-bright)";
-      sum.textContent = "Best effort: a " + moves.length + "-move sequence (needs checking — see below).";
-    } else {
-      sum.textContent = "Solved in " + moves.length + " move" + (moves.length === 1 ? "" : "s") + ".";
-    }
+    sum.textContent = moves.length === 0
+      ? "Already solved — every plate is on pin 4."
+      : "Solved in " + moves.length + " move" + (moves.length === 1 ? "" : "s") + ".";
     box.appendChild(sum);
-    if (fallback && moves.length > 0) {
-      var warn = document.createElement("div");
-      warn.className = "small";
-      warn.style.cssText = "margin:8px 0 14px;color:var(--brass-bright);line-height:1.55";
-      warn.innerHTML = "There's no solution under the strict rule (a push is refused if a linked plate would hit a " +
-        "wall). This sequence assumes linked plates instead <b>stop</b> at the wall. <b>Try it:</b> if every step " +
-        "works in‑game, your lock behaves that way. If a plate <b>won't move</b> at some step, your game uses the " +
-        "strict rule — so a coupling is mis‑mapped; re‑check the wiring with the ◀ ▶ buttons.";
-      box.appendChild(warn);
-    }
 
     if (moves.length > 0) {
       var steps = document.createElement("div"); steps.className = "steps";
@@ -655,22 +637,13 @@
     // let the UI paint the disabled/searching state first
     setTimeout(function () {
       var t0 = (window.performance && performance.now) ? performance.now() : 0;
-      var eff = effectiveEffect();
-      var usedEdge = "block";
-      var res = L.solve(state.positions.slice(), eff, "block");
-      if (res.status === "unsolvable") {
-        // Fall back to the looser "plates stop at the wall" rule so the user gets
-        // something to try instead of a dead end. Flagged clearly in renderResult.
-        var alt = L.solve(state.positions.slice(), eff, "clamp");
-        if (alt.status === "solved") { res = alt; usedEdge = "clamp"; }
-      }
+      var res = L.solve(state.positions.slice(), effectiveEffect(), "block");
       var dt = t0 ? Math.round(performance.now() - t0) : null;
       btn.disabled = false;
 
       if (res.status === "solved") {
         state.solution = res.moves;
         state.solveStart = state.positions.slice();
-        state.solveEdge = usedEdge;
         state.playIndex = 0;
         meta.textContent = (dt !== null ? "searched in " + dt + " ms · " : "") +
           "explored " + res.visited.toLocaleString() + " states";
@@ -693,10 +666,11 @@
       tip.textContent = "This solver targets the usual 4–7 plate locks.";
     } else {
       sum.textContent = "No solution found from here.";
-      tip.innerHTML = "The lock can't reach all-centre even allowing plates to stop at the walls, so " +
-        "something's off in the input. Re-check, in order: each row's <b>→/←</b> arrow matches the way " +
-        "you actually pushed that plate; every plate that moves is recorded (and its direction); and the " +
-        "current positions. Use the <b>◀ ▶</b> buttons to confirm each push matches your game.";
+      tip.innerHTML = "Your game won't reach all-centre from these couplings and positions, so something's " +
+        "off in the input (the lock itself is always solvable). Re-check, in order: each row's <b>→/←</b> " +
+        "arrow matches the way you actually pushed that plate; every plate that moves is recorded with the " +
+        "right direction; and the current positions. Use the <b>◀ ▶</b> buttons to push each plate and " +
+        "confirm the others move exactly as they do in your game.";
     }
     box.appendChild(sum); box.appendChild(tip);
   }
@@ -707,7 +681,7 @@
     var s = state.solveStart.slice();
     for (var i = 0; i < k; i++) {
       var m = state.solution[i];
-      var nx = L.applyMove(s, m.plate, m.dir, eff, state.solveEdge); // rule that produced this solution
+      var nx = L.applyMove(s, m.plate, m.dir, eff, state.edge);
       if (nx) s = nx;
     }
     return s;
