@@ -28,13 +28,14 @@ This tool models exactly that and searches for an optimal solution.
 2. **Current positions** — click a slot on each plate to mark where its pin sits right now. The
    green‑tinted column is the target (pin 4). Use the **◀ ▶** buttons to test a real move with
    couplings applied — handy for sanity‑checking your wiring against the game.
-3. **Couplings** — fill the grid. Each **row** says what happens to every plate when you push
-   that plate **one notch right**. Click a cell to cycle:
+3. **Couplings** — the grid starts **empty**; fill in only the links your lock actually has. Each
+   **row** is one plate you push **one notch right**. Click a cell to cycle:
    - **→** the linked plate moves the **same** way you pushed,
    - **←** it moves the **opposite** way (inverted),
    - **·** no effect.
-   The brass‑edged diagonal is the plate you're pushing (it always moves itself, **→**). Pushing a
-   plate **left** simply does the opposite of its row.
+   The shaded **•** on the diagonal is the plate itself — it always moves when you push it, so you
+   never set it. Pushing a plate **left** simply mirrors its row. A worked example sits beside the
+   grid to show the idea.
 4. **Solve** — get the ordered step list. Press **▶ Play** to watch the lock open one move at a
    time, or **Copy steps** to take the list with you.
 

@@ -137,6 +137,19 @@
   .cell.neg { color: var(--red); border-color: #4a2b22; background: #1c110d; }
   .cell.diag { box-shadow: inset 0 0 0 1px var(--brass); }
   .cell:hover { border-color: var(--brass); }
+  .cell.self { color: #4a4032; background: #0e0a06; border-color: #221a11; cursor: default; box-shadow: none; }
+  .cell.self:hover { border-color: #221a11; }
+  .cell[disabled] { cursor: default; }
+
+  .cmatrix-wrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .cmatrix-edit { overflow-x: auto; }
+  .example {
+    flex: 1; min-width: 250px;
+    background: #1a140d; border: 1px solid var(--line); border-radius: 10px; padding: 12px 15px;
+  }
+  .example-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--brass); margin-bottom: 6px; }
+  .example-cap { color: var(--muted); font-size: 12.5px; margin: 12px 0 0; line-height: 1.55; }
+  #exampleMatrix { pointer-events: none; }
 
   /* ---- Solution ---- */
   .result { margin-top: 8px; }
@@ -210,15 +223,27 @@
   <section class="panel">
     <h2>3 · How the plates are wired (couplings)</h2>
     <p class="hint">
-      Each row says what happens to every plate when you push that plate <b>one notch right</b>.
-      Click a cell to cycle <span style="color:var(--green)">→ (also right)</span>,
-      <span style="color:var(--red)">← (goes left)</span>,
-      <span style="color:#5a4d3a">· (unaffected)</span>.
-      Pushing <b>left</b> just does the opposite. <b>How to find this in-game:</b> from a calm
-      lock, nudge one plate a single notch and watch which others move, and which way.
-      The brass-edged diagonal is the plate you're pushing (normally →).
+      The grid starts <b>empty</b> — fill in only what your lock actually does. Each row is one
+      plate you push <b>one notch right</b>; click a cell to set how another plate reacts:
+      <span style="color:var(--green)">→ moves the same way</span>,
+      <span style="color:var(--red)">← moves the opposite way</span>,
+      <span style="color:#5a4d3a">· no effect</span>. Pushing <b>left</b> just mirrors it.
+      The shaded <b>•</b> on the diagonal is the plate itself — it always moves when you push it,
+      so you never set it. <b>To map a lock:</b> tap one plate a single notch in-game and watch
+      which others move, and which way.
     </p>
-    <div style="overflow-x:auto"><div id="cmatrix"></div></div>
+    <div class="cmatrix-wrap">
+      <div class="cmatrix-edit"><div id="cmatrix"></div></div>
+      <aside class="example">
+        <div class="example-title">Example — reading the grid</div>
+        <table class="cmatrix" id="exampleMatrix"></table>
+        <p class="example-cap">
+          Here, pushing <b>P1</b> right also shoves <b>P2</b> right; pushing <b>P2</b> right pulls
+          <b>P3</b> the other way (inverted). Everything else is blank. Push <b>left</b> and the
+          same links run in reverse.
+        </p>
+      </aside>
+    </div>
   </section>
 
   <!-- SOLVE -->
@@ -259,16 +284,24 @@
   var timer = null;
 
   // ---------- model helpers ----------
-  function identity(n) {
+  // The user only fills in couplings, so the grid starts fully blank (all zeros).
+  // "A pushed plate moves itself" (+1 on the diagonal) is applied automatically at
+  // solve/simulate time by effectiveEffect(), so the user never has to set it.
+  function zeros(n) {
     var m = [];
-    for (var i = 0; i < n; i++) { var r = []; for (var j = 0; j < n; j++) r.push(i === j ? 1 : 0); m.push(r); }
+    for (var i = 0; i < n; i++) { var r = []; for (var j = 0; j < n; j++) r.push(0); m.push(r); }
     return m;
   }
   function resizeEffect(n) {
     var old = state.effect || [];
-    var m = identity(n);
+    var m = zeros(n);
     for (var i = 0; i < n; i++) for (var j = 0; j < n; j++)
       if (old[i] && old[i][j] !== undefined) m[i][j] = old[i][j];
+    return m;
+  }
+  function effectiveEffect() {
+    var m = [];
+    for (var i = 0; i < state.n; i++) { var r = state.effect[i].slice(); r[i] = 1; m.push(r); }
     return m;
   }
 
@@ -279,9 +312,10 @@
       state.positions = saved.positions; state.effect = saved.effect;
     } else {
       state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
-      state.effect = identity(state.n);
+      state.effect = zeros(state.n);
     }
     buildPlateSeg();
+    renderExample();
     renderAll();
   }
 
@@ -418,17 +452,50 @@
       tr.appendChild(rl);
       for (var j2 = 0; j2 < state.n; j2++) {
         var td = document.createElement("td");
-        var v = state.effect[i][j2];
         var cell = document.createElement("button");
-        cell.className = "cell " + (v > 0 ? "pos" : v < 0 ? "neg" : "zero") + (i === j2 ? " diag" : "");
-        cell.textContent = v > 0 ? "→" : v < 0 ? "←" : "·";
-        (function (ri, ci) { cell.onclick = function () { cycleCoupling(ri, ci); }; })(i, j2);
+        if (i === j2) {
+          cell.className = "cell self";
+          cell.textContent = "•";
+          cell.disabled = true;
+          cell.title = "P" + (i + 1) + " always moves itself when you push it";
+        } else {
+          var v = state.effect[i][j2];
+          cell.className = "cell " + (v > 0 ? "pos" : v < 0 ? "neg" : "zero");
+          cell.textContent = v > 0 ? "→" : v < 0 ? "←" : "·";
+          (function (ri, ci) { cell.onclick = function () { cycleCoupling(ri, ci); }; })(i, j2);
+        }
         td.appendChild(cell);
         tr.appendChild(td);
       }
       table.appendChild(tr);
     }
     host.appendChild(table);
+  }
+
+  // a fixed 3-plate illustration shown next to the editable grid
+  function renderExample() {
+    var ex = [[0, 1, 0], [0, 0, -1], [0, 0, 0]]; // diagonal is drawn as "self"
+    var table = document.getElementById("exampleMatrix");
+    if (!table) return;
+    table.innerHTML = "";
+    var thead = document.createElement("tr");
+    thead.appendChild(document.createElement("th"));
+    for (var j = 0; j < 3; j++) { var th = document.createElement("th"); th.textContent = "P" + (j + 1); thead.appendChild(th); }
+    table.appendChild(thead);
+    for (var i = 0; i < 3; i++) {
+      var tr = document.createElement("tr");
+      var rl = document.createElement("th"); rl.className = "rowlbl";
+      rl.innerHTML = "Push P" + (i + 1) + " <span style='color:var(--green)'>→</span>";
+      tr.appendChild(rl);
+      for (var j2 = 0; j2 < 3; j2++) {
+        var td = document.createElement("td");
+        var cell = document.createElement("button");
+        if (i === j2) { cell.className = "cell self"; cell.textContent = "•"; }
+        else { var v = ex[i][j2]; cell.className = "cell " + (v > 0 ? "pos" : v < 0 ? "neg" : "zero"); cell.textContent = v > 0 ? "→" : v < 0 ? "←" : "·"; }
+        td.appendChild(cell); tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
   }
 
   function renderResult() {
@@ -489,13 +556,14 @@
     save(); renderLock();
   }
   function manualMove(i, dir) {
-    var next = L.applyMove(state.positions, i, dir, state.effect, state.edge);
+    var next = L.applyMove(state.positions, i, dir, effectiveEffect(), state.edge);
     if (next === null) return; // blocked
     state.positions = next;
     clearSolution();
     save(); renderLock();
   }
   function cycleCoupling(i, j) {
+    if (i === j) return; // the diagonal is automatic, not user-set
     var v = state.effect[i][j];
     state.effect[i][j] = v > 0 ? -1 : v < 0 ? 0 : 1; // +1 -> -1 -> 0 -> +1
     clearSolution();
@@ -509,7 +577,7 @@
     // let the UI paint the disabled/searching state first
     setTimeout(function () {
       var t0 = (window.performance && performance.now) ? performance.now() : 0;
-      var res = L.solve(state.positions.slice(), state.effect, state.edge);
+      var res = L.solve(state.positions.slice(), effectiveEffect(), state.edge);
       var dt = t0 ? Math.round(performance.now() - t0) : null;
       btn.disabled = false;
 
@@ -538,19 +606,20 @@
       tip.textContent = "This solver targets the usual 4–7 plate locks.";
     } else {
       sum.textContent = "No solution found from here.";
-      tip.innerHTML = "Double-check the couplings against your game, make sure each plate's " +
-        "diagonal is set (normally →), and try a different <b>Edge behaviour</b> " +
-        "(your lock may wrap instead of clamp).";
+      tip.innerHTML = "Double-check the couplings and current positions against your game — " +
+        "tap each plate once in-game and record which other plates move and which way. " +
+        "A mistyped link or a wrong starting position is the usual cause.";
     }
     box.appendChild(sum); box.appendChild(tip);
   }
 
   // ---------- play-through ----------
   function stateAtStep(k) {
+    var eff = effectiveEffect();
     var s = state.solveStart.slice();
     for (var i = 0; i < k; i++) {
       var m = state.solution[i];
-      var nx = L.applyMove(s, m.plate, m.dir, state.effect, state.edge);
+      var nx = L.applyMove(s, m.plate, m.dir, eff, state.edge);
       if (nx) s = nx;
     }
     return s;
@@ -594,7 +663,7 @@
   // ---------- wiring ----------
   document.getElementById("resetBtn").onclick = function () {
     state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
-    state.effect = identity(state.n);
+    state.effect = zeros(state.n);
     clearSolution(); save(); renderAll();
   };
   document.getElementById("solveBtn").onclick = solve;
