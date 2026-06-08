@@ -9,7 +9,7 @@ No build step, no server, no tracking — it's one HTML file plus one script. Op
 
 ---
 
-## The minigame, in one paragraph
+## The minigame
 
 A lock is a stack of **4–7 horizontal plates**. Each plate has **7 holes** and one pin; you
 select a plate and slide it **left / right** one notch at a time. Because the plate slides under a
@@ -68,8 +68,6 @@ Everything lives in [`solver.js`](solver.js) (pure logic, no DOM) and [`index.ht
 ## Running and deploying
 
 - **Run locally:** just open `index.html` in a browser. That's it.
-- **Host it:** it's fully static, so GitHub Pages works out of the box — enable Pages on this repo
-  (Settings → Pages → deploy from the `main` branch) and it's live.
 
 ## Tests
 
@@ -88,12 +86,3 @@ trials, and an `N=7` performance check). A green `RESULT: PASS …` line at the 
   easiest and stay consistent across positions, couplings, and the solution. Some guides number
   plates bottom‑to‑top; use the **Plate order** toggle to put `P1` at the top or bottom so the
   on‑screen stack matches your view.
-
-## Prior art & sources
-
-This is a small, self‑contained take on a well‑explored puzzle. The mechanic and the
-coupling‑matrix approach are corroborated by several community guides and open‑source solvers,
-including write‑ups on Mobalytics, GameRant and PC Gamer, and tools such as
-[Razikus/gothic-remake-chestlock-solver](https://github.com/Razikus/gothic-remake-chestlock-solver),
-[Xetoxyc/gothic-remake-lockpicker](https://github.com/Xetoxyc/gothic-remake-lockpicker), and
-[kamilcieslik/gothic-remake-lockbreaker](https://github.com/kamilcieslik/gothic-remake-lockbreaker).
