@@ -30,14 +30,16 @@ This tool models exactly that and searches for an optimal solution.
    couplings applied — handy for sanity‑checking your wiring against the game. The **Plate order**
    toggle flips the stack (P1 at top ↔ P1 at bottom) so it matches what you see in‑game; it's a
    display choice only and the solution's plate numbers follow it.
-3. **Couplings** — the grid starts **empty**; fill in only the links your lock actually has. Each
-   **row** is one plate you push **one notch right**. Click a cell to cycle:
-   - **→** the linked plate moves the **same** way you pushed,
-   - **←** it moves the **opposite** way (inverted),
-   - **·** no effect.
+3. **Couplings** — the grid starts **empty**; fill in only the links your lock has. Each **row**
+   is one plate you push **one notch**. Click the **arrow by its name** to set the direction you
+   tested (**→** right or **←** left) — left and right are mirror images, so record whichever you
+   actually did and the solver works out the opposite. Then click a cell to show which way that
+   plate **slides**:
+   - **→** it slides right,
+   - **←** it slides left,
+   - **·** it doesn't move.
    The shaded **•** on the diagonal is the plate itself — it always moves when you push it, so you
-   never set it. Pushing a plate **left** simply mirrors its row. A worked example sits beside the
-   grid to show the idea.
+   never set it. A worked example sits beside the grid to show the idea.
 4. **Solve** — get the ordered step list. Press **▶ Play** to watch the lock open one move at a
    time, or **Copy steps** to take the list with you.
 
@@ -46,8 +48,9 @@ Your setup is saved in the browser, so a refresh won't lose it.
 ### Discovering the wiring in‑game
 
 From a settled lock, nudge **one** plate a single notch and watch which other plates move and in
-which direction; that fills one row of the grid. Repeat for each plate. (Higher lockpicking skill
-in‑game can *remove* a connection, which just means a cell becomes **·**.)
+which direction; that fills one row of the grid. Set that row's arrow to the way you nudged it
+(**→** or **←**) so you can record exactly what you saw. Repeat for each plate. (Higher lockpicking
+skill in‑game can *remove* a connection, which just means a cell becomes **·**.)
 
 ## How it works
 

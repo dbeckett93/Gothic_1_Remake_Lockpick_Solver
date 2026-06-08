@@ -140,6 +140,14 @@
   .cell.self { color: #4a4032; background: #0e0a06; border-color: #221a11; cursor: default; box-shadow: none; }
   .cell.self:hover { border-color: #221a11; }
   .cell[disabled] { cursor: default; }
+  .dirbtn {
+    background: transparent; border: 1px solid var(--line); border-radius: 6px;
+    padding: 0 7px; margin-left: 7px; cursor: pointer; font: inherit; font-size: 15px;
+    font-weight: 700; line-height: 22px; vertical-align: middle;
+  }
+  .dirbtn.r { color: var(--green); }
+  .dirbtn.l { color: var(--red); }
+  .dirbtn:hover { border-color: var(--brass); }
 
   .cmatrix-wrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
   .cmatrix-edit { overflow-x: auto; }
@@ -237,14 +245,15 @@
   <section class="panel">
     <h2>3 · How the plates are wired (couplings)</h2>
     <p class="hint">
-      The grid starts <b>empty</b> — fill in only what your lock actually does. Each row is one
-      plate you push <b>one notch right</b>; click a cell to set how another plate reacts:
-      <span style="color:var(--green)">→ moves the same way</span>,
-      <span style="color:var(--red)">← moves the opposite way</span>,
-      <span style="color:#5a4d3a">· no effect</span>. Pushing <b>left</b> just mirrors it.
-      The shaded <b>•</b> on the diagonal is the plate itself — it always moves when you push it,
-      so you never set it. <b>To map a lock:</b> tap one plate a single notch in-game and watch
-      which others move, and which way.
+      The grid starts <b>empty</b> — fill in only the links your lock has. Each row is one plate
+      you push <b>one notch</b>. Click the <b>arrow by its name</b> to set the direction you tested
+      (<span style="color:var(--green)">→ right</span> or <span style="color:var(--red)">← left</span>) —
+      the two are mirror images, so record whichever you actually did and the solver works out the
+      opposite. Then click a cell to show which way that plate <b>slides</b>:
+      <span style="color:var(--green)">→ right</span>, <span style="color:var(--red)">← left</span>,
+      <span style="color:#5a4d3a">· stays put</span>. The shaded <b>•</b> is the plate itself — it
+      always moves when pushed, so you never set it. <b>To map a lock:</b> nudge one plate a single
+      notch in-game and watch which others move, and which way.
     </p>
     <div class="cmatrix-wrap">
       <div class="cmatrix-edit"><div id="cmatrix"></div></div>
@@ -290,7 +299,8 @@
     edge: "block",       // the game's "walls" rule (fixed)
     flip: false,         // false: P1 drawn at top; true: P1 at bottom (display only)
     positions: null,     // length n, 0..6 (current, also used as play scratch)
-    effect: null,        // n x n
+    effect: null,        // n x n, canonical = effect of pushing each plate RIGHT
+    pushDir: null,       // per-row input lens: +1 describe a right push, -1 a left push
     solution: null,      // [{plate,dir}]
     solveStart: null,    // positions snapshot at solve time
     playIndex: 0,
@@ -314,6 +324,13 @@
       if (old[i] && old[i][j] !== undefined) m[i][j] = old[i][j];
     return m;
   }
+  function dirOnes(n) { var a = []; for (var i = 0; i < n; i++) a.push(1); return a; }
+  function resizeDir(n) {
+    var old = state.pushDir || [];
+    var a = dirOnes(n);
+    for (var i = 0; i < n; i++) if (old[i] === -1 || old[i] === 1) a[i] = old[i];
+    return a;
+  }
   function effectiveEffect() {
     var m = [];
     for (var i = 0; i < state.n; i++) { var r = state.effect[i].slice(); r[i] = 1; m.push(r); }
@@ -326,9 +343,11 @@
       state.n = saved.n;
       state.flip = !!saved.flip;
       state.positions = saved.positions; state.effect = saved.effect;
+      state.pushDir = (saved.pushDir && saved.pushDir.length === saved.n) ? saved.pushDir : dirOnes(saved.n);
     } else {
       state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
       state.effect = zeros(state.n);
+      state.pushDir = dirOnes(state.n);
     }
     buildPlateSeg();
     renderExample();
@@ -341,6 +360,7 @@
     for (var i = 0; i < n; i++) pos.push(state.positions[i] !== undefined ? state.positions[i] : 0);
     state.positions = pos;
     state.effect = resizeEffect(n);
+    state.pushDir = resizeDir(n);
     clearSolution();
     save(); renderAll();
   }
@@ -349,7 +369,8 @@
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        n: state.n, flip: state.flip, positions: state.positions, effect: state.effect
+        n: state.n, flip: state.flip, positions: state.positions,
+        effect: state.effect, pushDir: state.pushDir
       }));
     } catch (e) {}
   }
@@ -469,9 +490,17 @@
     table.appendChild(thead);
 
     for (var i = 0; i < state.n; i++) {
+      var d = state.pushDir[i];
       var tr = document.createElement("tr");
       var rl = document.createElement("th"); rl.className = "rowlbl";
-      rl.innerHTML = "Push P" + (i + 1) + " <span style='color:var(--green)'>→</span>";
+      rl.appendChild(document.createTextNode("Push P" + (i + 1) + " "));
+      var db = document.createElement("button");
+      db.className = "dirbtn " + (d > 0 ? "r" : "l");
+      db.textContent = d > 0 ? "→" : "←";
+      db.title = "You pushed P" + (i + 1) + " " + (d > 0 ? "right" : "left") +
+        " — click to switch the direction you're describing";
+      (function (ri) { db.onclick = function () { toggleDir(ri); }; })(i);
+      rl.appendChild(db);
       tr.appendChild(rl);
       for (var j2 = 0; j2 < state.n; j2++) {
         var td = document.createElement("td");
@@ -482,7 +511,7 @@
           cell.disabled = true;
           cell.title = "P" + (i + 1) + " always moves itself when you push it";
         } else {
-          var v = state.effect[i][j2];
+          var v = state.effect[i][j2] * d; // shown for the direction you tested
           cell.className = "cell " + (v > 0 ? "pos" : v < 0 ? "neg" : "zero");
           cell.textContent = v > 0 ? "→" : v < 0 ? "←" : "·";
           (function (ri, ci) { cell.onclick = function () { cycleCoupling(ri, ci); }; })(i, j2);
@@ -508,7 +537,9 @@
     for (var i = 0; i < 3; i++) {
       var tr = document.createElement("tr");
       var rl = document.createElement("th"); rl.className = "rowlbl";
-      rl.innerHTML = "Push P" + (i + 1) + " <span style='color:var(--green)'>→</span>";
+      rl.appendChild(document.createTextNode("Push P" + (i + 1) + " "));
+      var db = document.createElement("button"); db.className = "dirbtn r"; db.textContent = "→";
+      rl.appendChild(db);
       tr.appendChild(rl);
       for (var j2 = 0; j2 < 3; j2++) {
         var td = document.createElement("td");
@@ -587,10 +618,16 @@
   }
   function cycleCoupling(i, j) {
     if (i === j) return; // the diagonal is automatic, not user-set
-    var v = state.effect[i][j];
-    state.effect[i][j] = v > 0 ? -1 : v < 0 ? 0 : 1; // +1 -> -1 -> 0 -> +1
+    var d = state.pushDir[i];
+    var disp = state.effect[i][j] * d;           // value as shown in the tested direction
+    var next = disp > 0 ? -1 : disp < 0 ? 0 : 1; // blank -> → -> ← -> blank
+    state.effect[i][j] = next * d;               // store back in canonical (right-push) form
     clearSolution();
     save(); renderCouplings();
+  }
+  function toggleDir(i) {
+    state.pushDir[i] = -state.pushDir[i]; // input lens only; canonical effect unchanged
+    save(); renderCouplings();            // keeps any computed solution valid
   }
 
   function solve() {
@@ -692,6 +729,7 @@
   document.getElementById("resetBtn").onclick = function () {
     state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
     state.effect = zeros(state.n);
+    state.pushDir = dirOnes(state.n);
     clearSolution(); save(); renderAll();
   };
   document.getElementById("solveBtn").onclick = solve;
