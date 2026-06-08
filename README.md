@@ -24,8 +24,7 @@ This tool models exactly that and searches for an optimal solution.
 
 ## How to use it
 
-1. **Lock setup** — pick the number of plates, what to optimise for, and the edge behaviour
-   (leave it on **Walls** — that's the real game).
+1. **Lock setup** — pick the number of plates.
 2. **Current positions** — click a slot on each plate to mark where its pin sits right now. The
    green‑tinted column is the target (pin 4). Use the **◀ ▶** buttons to test a real move with
    couplings applied — handy for sanity‑checking your wiring against the game.
@@ -47,27 +46,13 @@ From a settled lock, nudge **one** plate a single notch and watch which other pl
 which direction; that fills one row of the grid. Repeat for each plate. (Higher lockpicking skill
 in‑game can *remove* a connection, which just means a cell becomes **·**.)
 
-## Options
-
-- **Optimise for**
-  - **Fewest moves** *(default)* — the least total nudges.
-  - **Fewest switches** — the least times you re‑select a plate. Selecting a new plate is the slow
-    in‑game action, so this groups all of a plate's nudges together (often nicer to execute, even
-    if it's a few more nudges overall).
-- **Edge behaviour**
-  - **Walls** *(default, matches the game)* — a move is refused if it would push any pin past hole
-    1 or 7.
-  - **Wrap** *(experimental)* — pins loop around the ends. Only use it if your lock actually behaves
-    that way; it changes the answer.
-
 ## How it works
 
 The lock is a state vector (one position per plate). Each move applies a fixed `±1` effect to the
 pushed plate and its linked plates. The solver runs a **breadth‑first search over the bounded state
 space** (`7^N ≤ 823,543` for `N ≤ 7`), which returns a provably **shortest** solution and — unlike
 solving it as linear algebra — stays correct under the "walls" rule, where a blocked move simply
-isn't a legal edge. "Fewest switches" uses a **0‑1 BFS** over an augmented *(state, last‑plate)*
-graph so that staying on the same plate is free and switching costs one.
+isn't a legal edge.
 
 Everything lives in [`solver.js`](solver.js) (pure logic, no DOM) and [`index.html`](index.html)
 (the UI).
@@ -81,9 +66,8 @@ Everything lives in [`solver.js`](solver.js) (pure logic, no DOM) and [`index.ht
 ## Tests
 
 Open [`tests.html`](tests.html) in a browser to run the solver's self‑tests (correctness of the
-atomic "walls" rule, optimality of both objectives versus reference searches, ~900 randomised
-end‑to‑end trials, and an `N=7` performance check). A green `RESULT: PASS …` line at the top means
-all good.
+atomic "walls" rule, optimality of the search versus a reference, ~900 randomised end‑to‑end
+trials, and an `N=7` performance check). A green `RESULT: PASS …` line at the top means all good.
 
 ## Notes & limitations
 

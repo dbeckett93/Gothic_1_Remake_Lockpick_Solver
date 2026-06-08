@@ -184,32 +184,14 @@
         <div class="seg" id="plateSeg"></div>
       </div>
       <div class="field">
-        <span>Optimise for</span>
-        <div class="seg" id="objSeg">
-          <button data-obj="moves">Fewest moves</button>
-          <button data-obj="switches">Fewest switches</button>
-        </div>
-      </div>
-      <div class="field">
-        <span>Edge behaviour</span>
-        <div class="seg" id="edgeSeg">
-          <button data-edge="block">Walls (game)</button>
-          <button data-edge="wrap">Wrap (test)</button>
-        </div>
-      </div>
-      <div class="field">
         <span>&nbsp;</span>
         <button class="btn" id="resetBtn">Reset lock</button>
       </div>
     </div>
     <p class="hint" style="margin-top:14px;margin-bottom:0">
-      <b>Walls</b> is how the real game works: a pin can't leave holes 1–7, so any push
-      (including the coupled knock-on) that would shove a pin off an edge is refused.
-      <b>Wrap</b> is an experimental mode where pins loop around — only use it if your lock
-      really behaves that way. &nbsp;·&nbsp;
-      <b>Optimise for</b>: <b>Fewest moves</b> = least total nudges; <b>Fewest switches</b> =
-      least times you re-select a plate (the slow in-game action), so each plate's nudges are
-      grouped together.
+      A pin can't leave holes 1–7, so any push — including the coupled knock-on movement of a
+      linked plate — that would shove a pin off an edge is refused, exactly like the game. The
+      solver finds the fewest total moves and never asks for an illegal push.
     </p>
   </section>
 
@@ -266,8 +248,7 @@
 
   var state = {
     n: 5,
-    edge: "block",       // 'block' (real game) | 'wrap'
-    objective: "moves",  // 'moves' | 'switches'
+    edge: "block",       // the game's "walls" rule (fixed)
     positions: null,     // length n, 0..6 (current, also used as play scratch)
     effect: null,        // n x n
     solution: null,      // [{plate,dir}]
@@ -295,8 +276,6 @@
     var saved = load();
     if (saved) {
       state.n = saved.n;
-      state.edge = (saved.edge === "wrap") ? "wrap" : "block"; // migrate old 'clamp'
-      state.objective = (saved.objective === "switches") ? "switches" : "moves";
       state.positions = saved.positions; state.effect = saved.effect;
     } else {
       state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
@@ -320,8 +299,7 @@
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        n: state.n, edge: state.edge, objective: state.objective,
-        positions: state.positions, effect: state.effect
+        n: state.n, positions: state.positions, effect: state.effect
       }));
     } catch (e) {}
   }
@@ -356,12 +334,6 @@
     // segment highlights
     document.querySelectorAll("#plateSeg button").forEach(function (b) {
       b.classList.toggle("on", +b.dataset.k === state.n);
-    });
-    document.querySelectorAll("#edgeSeg button").forEach(function (b) {
-      b.classList.toggle("on", b.dataset.edge === state.edge);
-    });
-    document.querySelectorAll("#objSeg button").forEach(function (b) {
-      b.classList.toggle("on", b.dataset.obj === state.objective);
     });
     renderLock();
     renderCouplings();
@@ -466,13 +438,11 @@
     if (!state.solution) { meta.textContent = ""; return; }
 
     var moves = state.solution;
-    var sw = L.countSwitches(moves);
     var sum = document.createElement("div");
     sum.className = "summary good";
     sum.textContent = moves.length === 0
       ? "Already solved — every plate is on pin 4."
-      : "Solved in " + moves.length + " move" + (moves.length === 1 ? "" : "s") +
-        " · " + sw + " plate switch" + (sw === 1 ? "" : "es") + ".";
+      : "Solved in " + moves.length + " move" + (moves.length === 1 ? "" : "s") + ".";
     box.appendChild(sum);
 
     if (moves.length > 0) {
@@ -539,7 +509,7 @@
     // let the UI paint the disabled/searching state first
     setTimeout(function () {
       var t0 = (window.performance && performance.now) ? performance.now() : 0;
-      var res = L.solve(state.positions.slice(), state.effect, state.edge, { objective: state.objective });
+      var res = L.solve(state.positions.slice(), state.effect, state.edge);
       var dt = t0 ? Math.round(performance.now() - t0) : null;
       btn.disabled = false;
 
@@ -622,14 +592,6 @@
   }
 
   // ---------- wiring ----------
-  document.getElementById("edgeSeg").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-edge]"); if (!b) return;
-    state.edge = b.dataset.edge; clearSolution(); save(); renderAll();
-  });
-  document.getElementById("objSeg").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-obj]"); if (!b) return;
-    state.objective = b.dataset.obj; clearSolution(); save(); renderAll();
-  });
   document.getElementById("resetBtn").onclick = function () {
     state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
     state.effect = identity(state.n);
