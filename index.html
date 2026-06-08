@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gothic 1 Remake — Lockpick Solver</title>
+<style>
+  :root {
+    --bg: #14100c;
+    --panel: #211a13;
+    --panel-2: #2b2118;
+    --line: #3d2f20;
+    --ink: #e8dcc6;
+    --muted: #a08c6e;
+    --brass: #c9a25a;
+    --brass-bright: #f0c878;
+    --green: #6fbf73;
+    --green-dim: #2f5233;
+    --red: #d2694f;
+    --steel: #6b7079;
+    --steel-light: #aab0b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 50% -10%, #2a2016 0%, var(--bg) 60%);
+    color: var(--ink);
+    font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 18px 64px; }
+  header h1 {
+    margin: 0 0 4px; font-size: 26px; letter-spacing: .5px;
+    color: var(--brass-bright);
+    text-shadow: 0 1px 0 #000;
+  }
+  header p { margin: 0 0 18px; color: var(--muted); max-width: 70ch; }
+  a { color: var(--brass); }
+
+  .panel {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 0 0 18px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);
+  }
+  .panel h2 {
+    margin: 0 0 4px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--brass);
+  }
+  .panel .hint { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .panel .hint b { color: var(--ink); font-weight: 600; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    background: transparent; color: var(--muted); border: 0; padding: 8px 14px;
+    cursor: pointer; font: inherit; font-size: 14px;
+  }
+  .seg button:hover { color: var(--ink); background: rgba(201,162,90,.08); }
+  .seg button.on { background: var(--brass); color: #1a130a; font-weight: 700; }
+
+  button.btn {
+    background: linear-gradient(180deg, #3a2c1c, #2a2015);
+    color: var(--ink); border: 1px solid var(--line);
+    border-radius: 9px; padding: 9px 16px; cursor: pointer; font: inherit;
+  }
+  button.btn:hover { border-color: var(--brass); color: var(--brass-bright); }
+  button.btn.primary {
+    background: linear-gradient(180deg, var(--brass-bright), var(--brass));
+    color: #1a130a; font-weight: 700; border-color: #8a6a2e;
+    font-size: 16px; padding: 11px 22px;
+  }
+  button.btn.primary:hover { filter: brightness(1.08); color: #1a130a; }
+  button.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---- Lock ---- */
+  .lock { margin-top: 6px; }
+  .colhead { display: grid; grid-template-columns: 86px 1fr 86px; align-items: end; }
+  .colhead .nums { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; }
+  .colhead .nums span { color: var(--muted); font-size: 12px; padding-bottom: 4px; }
+  .colhead .nums span.tgt { color: var(--green); font-weight: 700; }
+
+  .plate { display: grid; grid-template-columns: 86px 1fr 86px; align-items: center; margin: 8px 0; }
+  .plate .name {
+    display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--steel-light);
+  }
+  .plate .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--steel); box-shadow: inset 0 0 0 1px #000; }
+  .plate.aligned .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .plate .arrows { display: flex; gap: 6px; justify-content: flex-end; }
+  .plate .arrows.left { justify-content: flex-start; }
+  .arrows button {
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(180deg, #444b54, #2c3137); color: var(--steel-light);
+    border: 1px solid #1a1d21; font-size: 16px; line-height: 1;
+  }
+  .arrows button:hover { color: #fff; border-color: var(--brass); }
+
+  .track {
+    position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
+    background: linear-gradient(180deg, #1a140d, #0f0b07);
+    border: 1px solid #000; border-radius: 8px; padding: 7px 8px; margin: 0 6px;
+  }
+  .slot {
+    height: 30px; border-radius: 6px; cursor: pointer;
+    background: #0c0906; border: 1px solid #2a2015;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .slot.tgt { background: #0e1a0f; border-color: var(--green-dim); }
+  .slot:hover { border-color: var(--brass); }
+  .slot .knob { width: 70%; height: 16px; border-radius: 4px; opacity: 0; transition: opacity .12s; }
+  .slot.on .knob {
+    opacity: 1;
+    background: linear-gradient(180deg, var(--steel-light), var(--steel));
+    box-shadow: 0 1px 2px #000, inset 0 1px 0 rgba(255,255,255,.4);
+  }
+  .plate.aligned .slot.on .knob {
+    background: linear-gradient(180deg, #9be09e, var(--green));
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  /* ---- Couplings ---- */
+  table.cmatrix { border-collapse: collapse; margin-top: 4px; }
+  table.cmatrix th, table.cmatrix td { padding: 4px; text-align: center; }
+  table.cmatrix th { color: var(--muted); font-size: 12px; font-weight: 600; }
+  table.cmatrix th.rowlbl { text-align: right; padding-right: 10px; white-space: nowrap; color: var(--steel-light); }
+  .cell {
+    width: 40px; height: 36px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--line); background: #17110b; color: var(--muted);
+    font-size: 17px; font-weight: 700; line-height: 34px;
+  }
+  .cell.zero { color: #5a4d3a; }
+  .cell.pos { color: var(--green); border-color: var(--green-dim); background: #11190f; }
+  .cell.neg { color: var(--red); border-color: #4a2b22; background: #1c110d; }
+  .cell.diag { box-shadow: inset 0 0 0 1px var(--brass); }
+  .cell:hover { border-color: var(--brass); }
+
+  /* ---- Solution ---- */
+  .result { margin-top: 8px; }
+  .result .summary { font-size: 17px; margin-bottom: 12px; }
+  .result .summary.good { color: var(--green); }
+  .result .summary.bad { color: var(--red); }
+  .steps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .step {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #17110b; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 11px; font-size: 14px;
+  }
+  .step .idx { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .step .pl { color: var(--steel-light); font-weight: 700; }
+  .step .ar { font-size: 17px; font-weight: 700; }
+  .step .ar.r { color: var(--green); }
+  .step .ar.l { color: var(--red); }
+  .step.done { opacity: .45; }
+  .step.next { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass); }
+  .player { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .player .pos { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 110px; }
+  .small { font-size: 12px; color: var(--muted); }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 26px; text-align: center; }
+  code { background: #0e0a06; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--brass); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚙ Gothic 1 Remake — Lockpick Solver</h1>
+    <p>
+      The chest lock is a set of coupled plates. Moving one plate can nudge others (sometimes
+      in the opposite direction). Tell the solver how your lock is wired and where the plates
+      sit now, and it finds the <b>shortest</b> sequence of moves that lines every plate up on
+      <b>pin&nbsp;4</b>.
+    </p>
+  </header>
+
+  <!-- SETUP -->
+  <section class="panel">
+    <h2>1 · Lock setup</h2>
+    <div class="row">
+      <div class="field">
+        <span>Plates</span>
+        <div class="seg" id="plateSeg"></div>
+      </div>
+      <div class="field">
+        <span>Optimise for</span>
+        <div class="seg" id="objSeg">
+          <button data-obj="moves">Fewest moves</button>
+          <button data-obj="switches">Fewest switches</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>Edge behaviour</span>
+        <div class="seg" id="edgeSeg">
+          <button data-edge="block">Walls (game)</button>
+          <button data-edge="wrap">Wrap (test)</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>&nbsp;</span>
+        <button class="btn" id="resetBtn">Reset lock</button>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:14px;margin-bottom:0">
+      <b>Walls</b> is how the real game works: a pin can't leave holes 1–7, so any push
+      (including the coupled knock-on) that would shove a pin off an edge is refused.
+      <b>Wrap</b> is an experimental mode where pins loop around — only use it if your lock
+      really behaves that way. &nbsp;·&nbsp;
+      <b>Optimise for</b>: <b>Fewest moves</b> = least total nudges; <b>Fewest switches</b> =
+      least times you re-select a plate (the slow in-game action), so each plate's nudges are
+      grouped together.
+    </p>
+  </section>
+
+  <!-- LOCK -->
+  <section class="panel">
+    <h2>2 · The lock &amp; current positions</h2>
+    <p class="hint">
+      Click a <b>slot</b> to set where a plate sits right now. Use the <b>◀ ▶</b> buttons to
+      test a real move — couplings apply, so you can check the wiring matches your game.
+      Plate is green when it's on pin&nbsp;4.
+    </p>
+    <div class="lock" id="lock"></div>
+  </section>
+
+  <!-- COUPLINGS -->
+  <section class="panel">
+    <h2>3 · How the plates are wired (couplings)</h2>
+    <p class="hint">
+      Each row says what happens to every plate when you push that plate <b>one notch right</b>.
+      Click a cell to cycle <span style="color:var(--green)">→ (also right)</span>,
+      <span style="color:var(--red)">← (goes left)</span>,
+      <span style="color:#5a4d3a">· (unaffected)</span>.
+      Pushing <b>left</b> just does the opposite. <b>How to find this in-game:</b> from a calm
+      lock, nudge one plate a single notch and watch which others move, and which way.
+      The brass-edged diagonal is the plate you're pushing (normally →).
+    </p>
+    <div style="overflow-x:auto"><div id="cmatrix"></div></div>
+  </section>
+
+  <!-- SOLVE -->
+  <section class="panel">
+    <h2>4 · Solve</h2>
+    <div class="row" style="gap:14px">
+      <button class="btn primary" id="solveBtn">Solve lock ▸</button>
+      <span class="small" id="solveMeta"></span>
+    </div>
+    <div class="result" id="result"></div>
+  </section>
+
+  <div class="footer">
+    Couplings &amp; positions are saved in your browser. &nbsp;·&nbsp;
+    Order of moves matters (clamping is path-dependent). &nbsp;·&nbsp;
+    <a href="tests.html">solver self-tests</a>
+  </div>
+</div>
+
+<script src="solver.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LockSolver;
+  var POS = L.POS, T = L.TARGET_POS;
+  var STORE = "gothic-lockpick-v1";
+
+  var state = {
+    n: 5,
+    edge: "block",       // 'block' (real game) | 'wrap'
+    objective: "moves",  // 'moves' | 'switches'
+    positions: null,     // length n, 0..6 (current, also used as play scratch)
+    effect: null,        // n x n
+    solution: null,      // [{plate,dir}]
+    solveStart: null,    // positions snapshot at solve time
+    playIndex: 0,
+    playing: false
+  };
+  var timer = null;
+
+  // ---------- model helpers ----------
+  function identity(n) {
+    var m = [];
+    for (var i = 0; i < n; i++) { var r = []; for (var j = 0; j < n; j++) r.push(i === j ? 1 : 0); m.push(r); }
+    return m;
+  }
+  function resizeEffect(n) {
+    var old = state.effect || [];
+    var m = identity(n);
+    for (var i = 0; i < n; i++) for (var j = 0; j < n; j++)
+      if (old[i] && old[i][j] !== undefined) m[i][j] = old[i][j];
+    return m;
+  }
+
+  function init() {
+    var saved = load();
+    if (saved) {
+      state.n = saved.n;
+      state.edge = (saved.edge === "wrap") ? "wrap" : "block"; // migrate old 'clamp'
+      state.objective = (saved.objective === "switches") ? "switches" : "moves";
+      state.positions = saved.positions; state.effect = saved.effect;
+    } else {
+      state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
+      state.effect = identity(state.n);
+    }
+    buildPlateSeg();
+    renderAll();
+  }
+
+  function setPlateCount(n) {
+    state.n = n;
+    var pos = [];
+    for (var i = 0; i < n; i++) pos.push(state.positions[i] !== undefined ? state.positions[i] : 0);
+    state.positions = pos;
+    state.effect = resizeEffect(n);
+    clearSolution();
+    save(); renderAll();
+  }
+
+  // ---------- persistence ----------
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        n: state.n, edge: state.edge, objective: state.objective,
+        positions: state.positions, effect: state.effect
+      }));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(STORE));
+      if (s && s.n && s.positions && s.effect) return s;
+    } catch (e) {}
+    return null;
+  }
+
+  // ---------- solution lifecycle ----------
+  function clearSolution() {
+    stopPlay();
+    state.solution = null; state.solveStart = null; state.playIndex = 0;
+    renderResult();
+  }
+
+  // ---------- rendering ----------
+  function buildPlateSeg() {
+    var seg = document.getElementById("plateSeg");
+    seg.innerHTML = "";
+    [4, 5, 6, 7].forEach(function (k) {
+      var b = document.createElement("button");
+      b.textContent = k; b.dataset.k = k;
+      b.onclick = function () { setPlateCount(k); };
+      seg.appendChild(b);
+    });
+  }
+
+  function renderAll() {
+    // segment highlights
+    document.querySelectorAll("#plateSeg button").forEach(function (b) {
+      b.classList.toggle("on", +b.dataset.k === state.n);
+    });
+    document.querySelectorAll("#edgeSeg button").forEach(function (b) {
+      b.classList.toggle("on", b.dataset.edge === state.edge);
+    });
+    document.querySelectorAll("#objSeg button").forEach(function (b) {
+      b.classList.toggle("on", b.dataset.obj === state.objective);
+    });
+    renderLock();
+    renderCouplings();
+    renderResult();
+  }
+
+  function renderLock() {
+    var lock = document.getElementById("lock");
+    lock.innerHTML = "";
+
+    // column header
+    var head = document.createElement("div");
+    head.className = "colhead";
+    head.appendChild(document.createElement("div"));
+    var nums = document.createElement("div"); nums.className = "nums";
+    for (var c = 0; c < POS; c++) {
+      var s = document.createElement("span");
+      s.textContent = (c + 1);
+      if (c === T) { s.classList.add("tgt"); s.textContent = (c + 1) + " ▾"; }
+      nums.appendChild(s);
+    }
+    head.appendChild(nums);
+    head.appendChild(document.createElement("div"));
+    lock.appendChild(head);
+
+    for (var i = 0; i < state.n; i++) lock.appendChild(plateRow(i));
+  }
+
+  function plateRow(i) {
+    var aligned = state.positions[i] === T;
+    var row = document.createElement("div");
+    row.className = "plate" + (aligned ? " aligned" : "");
+
+    var name = document.createElement("div");
+    name.className = "name";
+    var dot = document.createElement("span"); dot.className = "dot";
+    var lbl = document.createElement("span"); lbl.textContent = "P" + (i + 1);
+    var arrowsL = document.createElement("div"); arrowsL.className = "arrows left";
+    var bl = document.createElement("button"); bl.textContent = "◀"; bl.title = "Push P" + (i + 1) + " left";
+    bl.onclick = function () { manualMove(i, -1); };
+    arrowsL.appendChild(bl);
+    name.appendChild(dot); name.appendChild(lbl); name.appendChild(arrowsL);
+
+    var track = document.createElement("div");
+    track.className = "track";
+    for (var c = 0; c < POS; c++) {
+      var slot = document.createElement("div");
+      slot.className = "slot" + (c === T ? " tgt" : "") + (c === state.positions[i] ? " on" : "");
+      var knob = document.createElement("div"); knob.className = "knob";
+      slot.appendChild(knob);
+      (function (col) { slot.onclick = function () { setPosition(i, col); }; })(c);
+      track.appendChild(slot);
+    }
+
+    var arrowsR = document.createElement("div"); arrowsR.className = "arrows";
+    var br = document.createElement("button"); br.textContent = "▶"; br.title = "Push P" + (i + 1) + " right";
+    br.onclick = function () { manualMove(i, 1); };
+    arrowsR.appendChild(br);
+
+    row.appendChild(name);
+    row.appendChild(track);
+    row.appendChild(arrowsR);
+    return row;
+  }
+
+  function renderCouplings() {
+    var host = document.getElementById("cmatrix");
+    host.innerHTML = "";
+    var table = document.createElement("table"); table.className = "cmatrix";
+
+    var thead = document.createElement("tr");
+    thead.appendChild(document.createElement("th"));
+    for (var j = 0; j < state.n; j++) {
+      var th = document.createElement("th"); th.textContent = "P" + (j + 1); thead.appendChild(th);
+    }
+    table.appendChild(thead);
+
+    for (var i = 0; i < state.n; i++) {
+      var tr = document.createElement("tr");
+      var rl = document.createElement("th"); rl.className = "rowlbl";
+      rl.innerHTML = "Push P" + (i + 1) + " <span style='color:var(--green)'>→</span>";
+      tr.appendChild(rl);
+      for (var j2 = 0; j2 < state.n; j2++) {
+        var td = document.createElement("td");
+        var v = state.effect[i][j2];
+        var cell = document.createElement("button");
+        cell.className = "cell " + (v > 0 ? "pos" : v < 0 ? "neg" : "zero") + (i === j2 ? " diag" : "");
+        cell.textContent = v > 0 ? "→" : v < 0 ? "←" : "·";
+        (function (ri, ci) { cell.onclick = function () { cycleCoupling(ri, ci); }; })(i, j2);
+        td.appendChild(cell);
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    host.appendChild(table);
+  }
+
+  function renderResult() {
+    var meta = document.getElementById("solveMeta");
+    var box = document.getElementById("result");
+    box.innerHTML = "";
+    if (!state.solution) { meta.textContent = ""; return; }
+
+    var moves = state.solution;
+    var sw = L.countSwitches(moves);
+    var sum = document.createElement("div");
+    sum.className = "summary good";
+    sum.textContent = moves.length === 0
+      ? "Already solved — every plate is on pin 4."
+      : "Solved in " + moves.length + " move" + (moves.length === 1 ? "" : "s") +
+        " · " + sw + " plate switch" + (sw === 1 ? "" : "es") + ".";
+    box.appendChild(sum);
+
+    if (moves.length > 0) {
+      var steps = document.createElement("div"); steps.className = "steps";
+      moves.forEach(function (m, k) {
+        var st = document.createElement("div");
+        st.className = "step" + (k < state.playIndex ? " done" : k === state.playIndex ? " next" : "");
+        var ar = m.dir > 0 ? "→" : "←";
+        st.innerHTML = "<span class='idx'>" + (k + 1) + "</span>" +
+          "<span class='pl'>P" + (m.plate + 1) + "</span>" +
+          "<span class='ar " + (m.dir > 0 ? "r" : "l") + "'>" + ar + "</span>";
+        steps.appendChild(st);
+      });
+      box.appendChild(steps);
+
+      var player = document.createElement("div"); player.className = "player";
+      player.appendChild(mkbtn(state.playing ? "❚❚ Pause" : "▶ Play", togglePlay));
+      player.appendChild(mkbtn("◀ Prev", function () { stepTo(state.playIndex - 1); }, state.playIndex <= 0));
+      player.appendChild(mkbtn("Next ▶", function () { stepTo(state.playIndex + 1); }, state.playIndex >= moves.length));
+      player.appendChild(mkbtn("⟲ To start", function () { stepTo(0); }, state.playIndex === 0));
+      var pos = document.createElement("span"); pos.className = "pos";
+      pos.textContent = "step " + state.playIndex + " / " + moves.length;
+      player.appendChild(pos);
+      player.appendChild(mkbtn("Copy steps", copySteps));
+      box.appendChild(player);
+
+      var note = document.createElement("div");
+      note.className = "small"; note.style.marginTop = "10px";
+      note.textContent = "Do the moves in this exact order. Press Play to watch the lock open.";
+      box.appendChild(note);
+    }
+  }
+
+  function mkbtn(label, fn, disabled) {
+    var b = document.createElement("button"); b.className = "btn"; b.textContent = label;
+    b.onclick = fn; if (disabled) b.disabled = true;
+    return b;
+  }
+
+  // ---------- interactions ----------
+  function setPosition(i, col) {
+    state.positions[i] = col;
+    clearSolution();
+    save(); renderLock();
+  }
+  function manualMove(i, dir) {
+    var next = L.applyMove(state.positions, i, dir, state.effect, state.edge);
+    if (next === null) return; // blocked
+    state.positions = next;
+    clearSolution();
+    save(); renderLock();
+  }
+  function cycleCoupling(i, j) {
+    var v = state.effect[i][j];
+    state.effect[i][j] = v > 0 ? -1 : v < 0 ? 0 : 1; // +1 -> -1 -> 0 -> +1
+    clearSolution();
+    save(); renderCouplings();
+  }
+
+  function solve() {
+    var btn = document.getElementById("solveBtn");
+    var meta = document.getElementById("solveMeta");
+    btn.disabled = true; meta.textContent = "searching…";
+    // let the UI paint the disabled/searching state first
+    setTimeout(function () {
+      var t0 = (window.performance && performance.now) ? performance.now() : 0;
+      var res = L.solve(state.positions.slice(), state.effect, state.edge, { objective: state.objective });
+      var dt = t0 ? Math.round(performance.now() - t0) : null;
+      btn.disabled = false;
+
+      if (res.status === "solved") {
+        state.solution = res.moves;
+        state.solveStart = state.positions.slice();
+        state.playIndex = 0;
+        meta.textContent = (dt !== null ? "searched in " + dt + " ms · " : "") +
+          "explored " + res.visited.toLocaleString() + " states";
+        renderResult();
+      } else {
+        state.solution = null;
+        renderResult();
+        showProblem(res, meta);
+      }
+    }, 20);
+  }
+
+  function showProblem(res, meta) {
+    meta.textContent = "";
+    var box = document.getElementById("result");
+    var sum = document.createElement("div"); sum.className = "summary bad";
+    var tip = document.createElement("div"); tip.className = "small"; tip.style.marginTop = "8px";
+    if (res.status === "too-large") {
+      sum.textContent = "Too many plates to brute-force (" + res.total.toLocaleString() + " states).";
+      tip.textContent = "This solver targets the usual 4–7 plate locks.";
+    } else {
+      sum.textContent = "No solution found from here.";
+      tip.innerHTML = "Double-check the couplings against your game, make sure each plate's " +
+        "diagonal is set (normally →), and try a different <b>Edge behaviour</b> " +
+        "(your lock may wrap instead of clamp).";
+    }
+    box.appendChild(sum); box.appendChild(tip);
+  }
+
+  // ---------- play-through ----------
+  function stateAtStep(k) {
+    var s = state.solveStart.slice();
+    for (var i = 0; i < k; i++) {
+      var m = state.solution[i];
+      var nx = L.applyMove(s, m.plate, m.dir, state.effect, state.edge);
+      if (nx) s = nx;
+    }
+    return s;
+  }
+  function stepTo(k) {
+    if (!state.solution) return;
+    k = Math.max(0, Math.min(state.solution.length, k));
+    state.playIndex = k;
+    state.positions = stateAtStep(k);
+    if (k >= state.solution.length) stopPlay();
+    renderLock(); renderResult();
+  }
+  function togglePlay() { state.playing ? stopPlay() : startPlay(); }
+  function startPlay() {
+    if (!state.solution || state.solution.length === 0) return;
+    if (state.playIndex >= state.solution.length) stepTo(0);
+    state.playing = true; renderResult();
+    timer = setInterval(function () {
+      if (!state.solution || state.playIndex >= state.solution.length) { stopPlay(); renderResult(); return; }
+      stepTo(state.playIndex + 1);
+    }, 650);
+  }
+  function stopPlay() {
+    state.playing = false;
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function copySteps() {
+    if (!state.solution) return;
+    var lines = state.solution.map(function (m, k) {
+      return (k + 1) + ". Plate " + (m.plate + 1) + " " + (m.dir > 0 ? "right →" : "left ←");
+    });
+    var text = "Gothic lockpick solution (" + state.solution.length + " moves):\n" + lines.join("\n");
+    try {
+      navigator.clipboard.writeText(text);
+    } catch (e) {
+      window.prompt("Copy the solution:", text);
+    }
+  }
+
+  // ---------- wiring ----------
+  document.getElementById("edgeSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-edge]"); if (!b) return;
+    state.edge = b.dataset.edge; clearSolution(); save(); renderAll();
+  });
+  document.getElementById("objSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-obj]"); if (!b) return;
+    state.objective = b.dataset.obj; clearSolution(); save(); renderAll();
+  });
+  document.getElementById("resetBtn").onclick = function () {
+    state.positions = []; for (var i = 0; i < state.n; i++) state.positions.push(0);
+    state.effect = identity(state.n);
+    clearSolution(); save(); renderAll();
+  };
+  document.getElementById("solveBtn").onclick = solve;
+
+  init();
+})();
+</script>
+</body>
+</html>

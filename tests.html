@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LockSolver tests</title>
+  <script src="solver.js"></script>
+</head>
+<body>
+  <h1>LockSolver self-tests</h1>
+  <pre id="summary">running…</pre>
+  <pre id="log"></pre>
+  <script>
+  (function () {
+    var L = window.LockSolver;
+    var pass = 0, fail = 0, lines = [];
+    function ok(cond, name, extra) {
+      if (cond) { pass++; lines.push('PASS  ' + name); }
+      else { fail++; lines.push('FAIL  ' + name + (extra ? '  ::  ' + extra : '')); }
+    }
+    // deterministic PRNG
+    function mulberry32(a) {
+      return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        var t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function replay(start, moves, effect, edge) {
+      var s = start.slice();
+      for (var i = 0; i < moves.length; i++) {
+        s = L.applyMove(s, moves[i].plate, moves[i].dir, effect, edge);
+        if (s === null) return null; // illegal move in block mode -> invalid solution
+      }
+      return s;
+    }
+    function ident(n) {
+      var m = [];
+      for (var i = 0; i < n; i++) { var r = []; for (var j = 0; j < n; j++) r.push(i === j ? 1 : 0); m.push(r); }
+      return m;
+    }
+
+    // 1. already solved -> 0 moves
+    (function () {
+      var r = L.solve([3, 3, 3], ident(3), 'clamp');
+      ok(r.status === 'solved' && r.moves.length === 0, 'already-solved => 0 moves', JSON.stringify(r));
+    })();
+
+    // 2. single plate from pin1 -> needs 3 right (clamp)
+    (function () {
+      var r = L.solve([0], [[1]], 'clamp');
+      ok(r.status === 'solved' && r.moves.length === 3, 'single plate 1->4 = 3 moves', JSON.stringify(r));
+      ok(L.isSolved(replay([0], r.moves, [[1]], 'clamp')), 'single plate replay reaches target');
+    })();
+
+    // 3. single plate from pin7 -> 3 left
+    (function () {
+      var r = L.solve([6], [[1]], 'clamp');
+      ok(r.status === 'solved' && r.moves.length === 3 && r.moves[0].dir === -1, 'single plate 7->4 = 3 left', JSON.stringify(r));
+    })();
+
+    // 4. coupling: move plate0 right also moves plate1 right; both need fixing
+    (function () {
+      var eff = [[1, 1], [0, 1]];
+      var r = L.solve([2, 3], eff, 'clamp'); // plate0 +1 needed, plate1 at target
+      ok(r.status === 'solved' && r.moves.length === 2, 'coupled fix = 2 moves', JSON.stringify(r));
+      ok(L.isSolved(replay([2, 3], r.moves, eff, 'clamp')), 'coupled replay reaches target');
+    })();
+
+    // 5. wrap: nearest direction wins (5 -> 3 is 2 left, not 5 right)
+    (function () {
+      var r = L.solve([5], [[1]], 'wrap');
+      ok(r.status === 'solved' && r.moves.length === 2 && r.moves[0].dir === -1, 'wrap takes short way (2 left)', JSON.stringify(r));
+    })();
+
+    // 6. unsolvable: a plate nothing can move, starting off target
+    (function () {
+      var r = L.solve([3, 2], [[1, 0], [0, 0]], 'clamp');
+      ok(r.status === 'unsolvable', 'stuck plate => unsolvable', JSON.stringify(r));
+    })();
+
+    // 7. too-large guard
+    (function () {
+      var r = L.solve([0, 0, 0, 0], ident(4), 'clamp', { maxStates: 100 });
+      ok(r.status === 'too-large', 'maxStates guard trips', JSON.stringify(r));
+    })();
+
+    // 8. block mode: a simple solvable case, and verify replay uses only legal moves
+    (function () {
+      var eff = [[1, 0], [0, 1]];
+      var r = L.solve([2, 5], eff, 'block');
+      ok(r.status === 'solved', 'block mode solves independent plates', JSON.stringify(r));
+      var end = replay([2, 5], r.moves, eff, 'block');
+      ok(end !== null && L.isSolved(end), 'block mode replay legal + solved');
+    })();
+
+    // 9. randomized end-to-end: lower-triangular (diag=1) matrices are always
+    //    solvable greedily, so BFS must solve every one and replay must hit target.
+    (function () {
+      var rng = mulberry32(123456789);
+      var trials = 0, solvedAll = true, replayAll = true;
+      for (var t = 0; t < 400; t++) {
+        var n = 2 + ((rng() * 5) | 0); // 2..6
+        var eff = ident(n);
+        for (var i = 0; i < n; i++)
+          for (var j = 0; j < i; j++)          // strictly lower triangle
+            eff[i][j] = ((rng() * 3) | 0) - 1;  // -1, 0, or 1
+        var start = [];
+        for (var k = 0; k < n; k++) start.push((rng() * 7) | 0);
+        var edge = rng() < 0.5 ? 'clamp' : 'wrap';
+        var r = L.solve(start, eff, edge);
+        trials++;
+        if (r.status !== 'solved') { solvedAll = false; lines.push('  trial unsolved n=' + n + ' edge=' + edge + ' start=' + start); continue; }
+        var end = replay(start, r.moves, eff, edge);
+        if (!end || !L.isSolved(end)) { replayAll = false; lines.push('  trial replay-mismatch n=' + n + ' start=' + start); }
+      }
+      ok(solvedAll, 'randomized: all lower-triangular locks solved (' + trials + ' trials)');
+      ok(replayAll, 'randomized: every solution replays to target');
+    })();
+
+    // 10. optimality sanity: BFS length matches a brute-force BFS length on a small case
+    (function () {
+      var eff = [[1, -1], [1, 1]];
+      var start = [1, 5];
+      var r = L.solve(start, eff, 'clamp');
+      // independent shortest-path check via plain Map BFS
+      function key(s) { return s.join(','); }
+      var q = [start.slice()], seen = {}; seen[key(start)] = 0; var best = -1;
+      while (q.length) {
+        var s = q.shift(); var dcur = seen[key(s)];
+        if (L.isSolved(s)) { best = dcur; break; }
+        for (var p = 0; p < 2; p++) for (var dd = 0; dd < 2; dd++) {
+          var ns = L.applyMove(s, p, dd === 0 ? 1 : -1, eff, 'clamp');
+          if (ns && !(key(ns) in seen)) { seen[key(ns)] = dcur + 1; q.push(ns); }
+        }
+      }
+      ok(r.status === 'solved' && r.moves.length === best, 'BFS length is optimal (=' + best + ')', JSON.stringify(r));
+    })();
+
+    // 11. atomic block vs per-component clamp (the #1 correctness trap)
+    (function () {
+      var eff = [[1, 1], [0, 1]]; // pushing P0 right also pushes P1 right
+      // P1 already at the right wall (6): pushing P0 right would shove P1 off -> illegal
+      ok(L.applyMove([3, 6], 0, 1, eff, 'block') === null, 'block: coupled-at-wall move refused (atomic)');
+      var clamped = L.applyMove([3, 6], 0, 1, eff, 'clamp');
+      ok(clamped && clamped[0] === 4 && clamped[1] === 6, 'clamp: per-component (P1 sticks at wall) — the wrong-for-Gothic behavior', JSON.stringify(clamped));
+    })();
+
+    // 12. block mode solves around a wall by using the legal direction
+    (function () {
+      var eff = [[1, 1], [0, 1]];
+      var r = L.solve([3, 6], eff, 'block'); // must walk P1 down to centre legally
+      ok(r.status === 'solved', 'block: solves with a pin at the wall', JSON.stringify(r));
+      ok(L.isSolved(replay([3, 6], r.moves, eff, 'block')), 'block: replay reaches target');
+    })();
+
+    // 13. switches objective: optimality vs a reference Dijkstra + self-consistency
+    function refSwitches(start, eff, edge, target) {
+      var n = start.length;
+      function neigh(key) {
+        var pp = key.split('|'); var st = pp[0].split(',').map(Number); var lp = +pp[1];
+        var out = [];
+        for (var p = 0; p < n; p++) for (var d = 0; d < 2; d++) {
+          var ns = L.applyMove(st, p, d === 0 ? 1 : -1, eff, edge);
+          if (!ns) continue;
+          out.push({ key: ns.join(',') + '|' + p, cost: (p === lp) ? 0 : 1, st: ns });
+        }
+        return out;
+      }
+      var startKey = start.join(',') + '|' + n;
+      var dist = {}; dist[startKey] = 0; var settled = {};
+      var tkey = target.join(',');
+      while (true) {
+        var u = null, ud = Infinity;
+        for (var k in dist) if (!settled[k] && dist[k] < ud) { ud = dist[k]; u = k; }
+        if (u === null) return Infinity;
+        settled[u] = 1;
+        if (u.split('|')[0] === tkey) return dist[u];
+        var nb = neigh(u);
+        for (var i = 0; i < nb.length; i++) {
+          var e = nb[i], nd = dist[u] + e.cost;
+          if (dist[e.key] === undefined || nd < dist[e.key]) dist[e.key] = nd;
+        }
+      }
+    }
+    (function () {
+      var eff = [[1, -1], [1, 1]], start = [1, 5], tgt = L.defaultTarget(2);
+      var rs = L.solve(start, eff, 'block', { objective: 'switches' });
+      var rm = L.solve(start, eff, 'block', { objective: 'moves' });
+      var ref = refSwitches(start, eff, 'block', tgt);
+      ok(rs.status === 'solved' && rs.switches === ref, 'switches: optimal vs reference (=' + ref + ')', JSON.stringify(rs));
+      ok(rs.switches === L.countSwitches(rs.moves), 'switches: reported count matches move list');
+      ok(L.isSolved(replay(start, rs.moves, eff, 'block')), 'switches: replay reaches target');
+      ok(rs.switches <= rm.switches, 'switches-objective never uses more switches than moves-objective');
+      ok(rm.moves.length <= rs.moves.length, 'moves-objective never uses more moves than switches-objective');
+    })();
+
+    // 14. randomized, BLOCK edge, independent plates (always solvable): both objectives
+    (function () {
+      var rng = mulberry32(2024), bad = false, badSw = false;
+      for (var t = 0; t < 250; t++) {
+        var n = 2 + ((rng() * 6) | 0); // 2..7
+        var eff = ident(n);
+        var start = []; for (var k = 0; k < n; k++) start.push((rng() * 7) | 0);
+        var rm = L.solve(start, eff, 'block', { objective: 'moves' });
+        var rs = L.solve(start, eff, 'block', { objective: 'switches' });
+        if (rm.status !== 'solved' || !L.isSolved(replay(start, rm.moves, eff, 'block'))) bad = true;
+        if (rs.status !== 'solved' || !L.isSolved(replay(start, rs.moves, eff, 'block')) || rs.switches > rm.switches) badSw = true;
+      }
+      ok(!bad, 'randomized block (independent): moves objective always solves + replays');
+      ok(!badSw, 'randomized block (independent): switches objective solves, replays, and >= as good on switches');
+    })();
+
+    // 15. randomized, BLOCK edge, coupled (may be unsolvable): solver must never lie
+    (function () {
+      var rng = mulberry32(777), bad = false;
+      for (var t = 0; t < 250; t++) {
+        var n = 2 + ((rng() * 3) | 0); // 2..4
+        var eff = ident(n);
+        for (var i = 0; i < n; i++) for (var j = 0; j < i; j++) eff[i][j] = ((rng() * 3) | 0) - 1;
+        var start = []; for (var k = 0; k < n; k++) start.push((rng() * 7) | 0);
+        var r = L.solve(start, eff, 'block', { objective: 'moves' });
+        if (r.status === 'solved' && !L.isSolved(replay(start, r.moves, eff, 'block'))) bad = true; // claimed solved but doesn't
+      }
+      ok(!bad, 'randomized block (coupled): every claimed solution actually solves');
+    })();
+
+    // 16. performance at the worst size (N=7), both objectives
+    (function () {
+      function ms() { return (window.performance && performance.now) ? performance.now() : 0; }
+      var n = 7;
+      var rng = mulberry32(42);
+      var eff = ident(n);
+      for (var i = 0; i < n; i++) for (var j = 0; j < i; j++) eff[i][j] = ((rng() * 3) | 0) - 1;
+      var start = []; for (var k = 0; k < n; k++) start.push((rng() * 7) | 0);
+      var t1 = ms(); var rm = L.solve(start, eff, 'block', { objective: 'moves' }); var dm = ms() - t1;
+      var t2 = ms(); var rs = L.solve(start, eff, 'block', { objective: 'switches' }); var ds = ms() - t2;
+      lines.push('  perf N=7 moves:    ' + Math.round(dm) + ' ms (' + rm.status + ', visited ' + rm.visited + ')');
+      lines.push('  perf N=7 switches: ' + Math.round(ds) + ' ms (' + rs.status + ', visited ' + rs.visited + ')');
+      ok(rm.status === 'solved' || rm.status === 'unsolvable', 'N=7 moves completes');
+      ok(rs.status === 'solved' || rs.status === 'unsolvable', 'N=7 switches completes');
+      ok(dm < 15000 && ds < 15000, 'N=7 both objectives finish under 15s');
+      // when both solve, they must agree the lock is solvable and each replay must hold
+      if (rm.status === 'solved') ok(L.isSolved(replay(start, rm.moves, eff, 'block')), 'N=7 moves replay holds');
+      if (rs.status === 'solved') ok(L.isSolved(replay(start, rs.moves, eff, 'block')), 'N=7 switches replay holds');
+    })();
+
+    document.getElementById('log').textContent = lines.join('\n');
+    document.getElementById('summary').textContent = 'RESULT: ' + (fail === 0 ? 'PASS' : 'FAIL') + ' ' + pass + '/' + (pass + fail);
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# scratch / preview artifacts produced while testing
+_*.html
+_*.png
+*.tmp
