@@ -1,5 +1,7 @@
 # Gothic 1 Remake — Lockpick Solver
 
+### ▶ Play it live: https://dbeckett93.github.io/Gothic_1_Remake_Lockpick_Solver/
+
 A tiny, dependency-free web app that solves the **sliding‑plate lock minigame** in the
 *Gothic 1 Remake*. Tell it how your lock is wired and where the plates sit, and it finds the
 shortest sequence of moves that lines every plate up on the centre pin.
@@ -67,6 +69,7 @@ Everything lives in [`solver.js`](solver.js) (pure logic, no DOM) and [`index.ht
 
 ## Running and deploying
 
+- **Play online:** [the live app](https://dbeckett93.github.io/Gothic_1_Remake_Lockpick_Solver/) — hosted on GitHub Pages, nothing to install.
 - **Run locally:** just open `index.html` in a browser. That's it.
 
 ## Tests
